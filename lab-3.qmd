@@ -1,0 +1,362 @@
+---
+title: "lab-3"
+subtitle: "Static Quarto Dashboards"
+format: 
+  dashboard:
+    orientation: rows
+    nav-buttons: [github]
+    github: https://github.com/ComedicToast/olympicdash_copy
+embed-resources: true
+editor: source
+execute: 
+  echo: false
+  warning: false
+---
+
+```{r}
+#| message: false
+library(tidyverse)
+library(readxl)
+library(here)
+library(scales)
+library(ggrepel)
+library(gganimate)
+library(gifski)
+library(leaflet)
+library(geojsonio)
+library(sf)
+library(viridisLite)
+```
+
+```{r}
+#| label: read-in-wellcome-data
+
+crosstabs <- read_excel(here("wgm2018.xlsx"), sheet=1, skip=2)
+full_data <- read_excel(here("wgm2018.xlsx"), sheet=2)
+dictionary <- read_excel(here("wgm2018.xlsx"), sheet=3)
+#this is cleaned data for q1 specifically
+cleaned <- read.csv(here("wgm_cleaned.csv"))
+```
+
+
+
+# Trust in scientists
+
+## Row - Leaflet Plot {height="60%}
+
+```{r}
+#| label: clean crosstabs data
+q2data <- crosstabs %>%
+fill(Question, .direction="down") %>%
+  filter(Question == "Wellcome Global Monitor Trust in Scientists Index (recoded into 3 categories)", Response == "High trust") %>%
+  mutate(`Column N %...4` = round(`Column N %...4`,4)) %>%
+  rename(`High trust in scientists %` = `Column N %...4`) %>%
+  select(1,4)
+```
+
+
+```{r}
+#| label: fix names
+q2data$Country[q2data$Country == "United States"] <- "United States of America"
+q2data$Country[q2data$Country == "Congo, Rep."] <- "Republic of the Congo"
+q2data$Country[q2data$Country == "Tanzania"] <- "United Republic of Tanzania"
+```
+
+
+```{r}
+#| label: second-improved-visualization
+#| message: false
+#| warning: false
+
+# Load GeoJSON
+WorldCountry <- st_read(here("countries.geo.json"))
+
+#join q2data and drop na's
+WorldCountry <-WorldCountry %>%
+  left_join(q2data, by = c("name" = "Country")) %>%
+  drop_na()
+
+# Define color palette
+pal <- colorBin("Greens", domain = WorldCountry$`High trust in scientists %`, bins = 6, na.color = "lightgrey")
+
+# Create map
+leaflet(WorldCountry) %>%
+  addTiles() %>%
+  addPolygons(
+    fillColor = ~pal(`High trust in scientists %`),
+    color = "white",
+    weight = 1,
+    fillOpacity = 0.8,
+    highlight = highlightOptions(
+      weight = 2,
+      color = "darkgrey",
+      fillOpacity = 1,
+      bringToFront = TRUE
+    ),
+    label = ~paste0(name, ": ", 100*`High trust in scientists %`, "%")
+  ) %>%
+  addLegend(
+    pal = pal,
+    values = ~WorldCountry$`High trust in scientists %`,
+    title = "Proportion with High Trust in Scientists",
+    position = "bottomright"
+  )
+```
+
+
+# Vaccines
+
+```{r}
+# Remove the trailing comma
+text <- sub(",$", "", dictionary[1,3])
+
+# Split by comma
+parts <- strsplit(text, ",\\s*")[[1]]
+
+parts <- as_tibble(parts)
+
+country_codes <- separate_wider_delim(parts, value, delim = "=", names = c("code", "country"))
+
+cleaned_codes <- left_join(cleaned, country_codes, by = "country")
+
+countries_regions <- full_data %>%
+  select(WP5, Regions_Report) %>%
+  rename("code" = "WP5") %>%
+  mutate(code = as.character(code))
+
+clean_regions <- left_join(cleaned_codes, countries_regions, by = "code") %>%
+  distinct() 
+```
+
+
+```{r}
+grouped <- clean_regions %>%
+  group_by(country) %>%
+  mutate(pct_vaccines_safe = sum(National.results[answer %in% c("Strongly agree", "Somewhat agree")]) / 1) %>%
+  select(country, pct_vaccines_safe, Regions_Report) %>%
+  distinct() %>%
+  mutate(Region = case_when(
+    Regions_Report %in% c(1, 2, 4, 5) ~ "Africa",
+    Regions_Report %in% c(6, 7, 8) ~ "Americas",
+    Regions_Report %in% c(9, 10, 11, 12, 18) ~ "Asia",
+    Regions_Report %in% c(3, 13) ~ "Middle East and North Africa",
+    Regions_Report %in% c(15, 16, 17, 0) ~ "Europe",
+    Regions_Report == 14 ~ "Former Soviet Union"
+  )) %>%
+  select(-Regions_Report) %>%
+  filter(!is.na(Region))
+```
+
+
+
+```{r}
+#| label: top and bottom 5 from each region
+top5bot5 <- grouped %>% 
+    group_by(Region) %>%
+    mutate(rank = rank(pct_vaccines_safe)) %>%
+    filter(rank <= 5 | rank > n() - 5) %>%
+    ungroup()
+
+medians <- grouped %>% 
+        group_by(Region) %>% 
+        summarize(median_value = median(pct_vaccines_safe)) %>%
+        mutate(y = Inf, label = paste0(scales::percent(median_value, accuracy = 0.1)))
+```
+
+
+```{r}
+#| label: labels for each region
+label_data <- grouped %>%
+  group_by(Region) %>%
+  slice_max(pct_vaccines_safe, n = 1) %>%  
+  ungroup()
+```
+
+
+```{r}
+#| label: new-and-improved-visualization
+test <- grouped %>%
+  ggplot(aes(x = pct_vaccines_safe, y=reorder(country, pct_vaccines_safe))) +
+  geom_vline(
+    data = medians,
+    aes(xintercept = median_value),
+    linetype = "dashed",
+    color = "black",
+    linewidth = 0.7
+  ) +
+  geom_point(aes(color = Region), show.legend = FALSE) +
+  geom_text_repel(data = top5bot5,
+                  aes(x = pct_vaccines_safe, y = country, label=country),
+                  size = 3,
+                  nudge_x = 0.1,
+                  nudge_y = -0.1,
+                  direction = "y",
+                  segment.color = "azure4",
+                  color = "gray50",
+                  box.padding = 0.35,
+                  max.overlaps = 20,
+                  max.time =	3,
+    ) +
+  geom_text(
+    data = medians,
+    aes(x = median_value, y = y, label = label),
+    vjust = 0,
+    hjust = 0.5,
+    size = 3,
+    color = "black"
+  ) +
+  geom_text(
+    data = label_data,
+    aes(x = 0.5, y = Inf, label = Region, color = Region),
+    vjust = 2,
+    size = 6.5,
+    fontface = "bold",
+    show.legend = FALSE,
+    inherit.aes = FALSE
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(face = "bold", size = 10),
+    panel.grid.minor.x = element_blank(), 
+    axis.text.y= element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.spacing = unit(1, "lines"),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    plot.margin = margin(15, 25, 15, 15)
+  ) +
+  labs(
+    title = "Percentage of people across countries who believes vaccines are safe",
+    subtitle = "Dashed line is the median for the region",
+    x = "Percentage who believe vaccines are safe",
+    y = ""
+  ) +
+  scale_x_continuous(labels = percent_format(scale=100),
+                     breaks = seq(0.4, 1, by = 0.2),
+                     expand = expansion(mult = c(0.05, 0.15))) +
+                     coord_cartesian(clip = "off") +
+                     transition_states(Region, transition_length = 0, state_length = 10)
+
+animate(test, nframes = 60, duration = 30)
+```
+
+
+
+
+## Row - Vaccine Graphics
+
+```{r}
+#| label: clean/grab data for part 3
+
+q3data <- crosstabs %>%
+  fill(Question, .direction="down") %>%
+  filter(Question == "Q26 Do you strongly or somewhat agree, strongly or somewhat disagree or neither agree nor disagree with the following statement? Vaccines are effective.") %>%
+  rename(`Proportion` = `Column N %...4`) %>%
+  select(1, 3:5)
+```
+
+
+```{r}
+# Remove the trailing comma
+text <- sub(",$", "", dictionary[1,3])
+
+# Split by comma
+parts <- strsplit(text, ",\\s*")[[1]]
+
+parts <- as_tibble(parts)
+
+country_codes <- separate_wider_delim(parts, value, delim = "=", names = c("code", "Country"))
+
+cleaned_codes <- left_join(q3data, country_codes, by = "Country")
+
+countries_regions <- full_data %>%
+  select(WP5, Regions_Report) %>%
+  rename("code" = "WP5") %>%
+  mutate(code = as.character(code),
+         Regions_Report = as.character(Regions_Report))
+
+clean_regions <- left_join(cleaned_codes, countries_regions, by = "code") %>%
+  distinct() 
+```
+
+
+```{r}
+# Remove the trailing comma
+text <- sub(",$", "", dictionary[57,3])
+
+# Split by comma
+parts <- strsplit(text, ",\\s*")[[1]]
+
+parts <- as_tibble(parts)
+
+region_codes <- separate_wider_delim(parts, value, delim = "=", names = c("Regions_Report", "Region"))
+
+cleaned_codes <- left_join(clean_regions, region_codes, by = "Regions_Report")
+
+q3clean <- cleaned_codes %>%
+  mutate(Region = replace_na(Region, "Not assigned")) %>%
+  select(-c(Proportion,code,Regions_Report)) %>%
+  filter(Response != "Total") %>%
+  rename(Counts = `Unweighted Count...5`)
+```
+
+
+```{r}
+region_response_props <- q3clean %>%
+  group_by(Region, Response) %>%
+  summarise(RegionCounts = sum(Counts)) %>%
+  mutate(Proportion = RegionCounts / sum(RegionCounts))
+
+region_response_props <- region_response_props %>%
+   mutate(Response = factor(Response, levels = c(
+    "Strongly agree",
+    "Somewhat agree",
+    "Neither agree nor disagree",
+    "Somewhat disagree",
+    "Strongly disagree",
+    "Don't know/Refused"
+  )))
+```
+
+```{r}
+label_data <- region_response_props %>%
+  group_by(Region) %>%
+  slice_max(RegionCounts, n = 1) %>%  
+  ungroup()
+```
+
+
+```{r}
+#| label: third-improved-visualization
+
+p <- ggplot(region_response_props, aes(x = factor(Response, c(
+    "Strongly agree",
+    "Somewhat agree",
+    "Neither agree nor disagree",
+    "Somewhat disagree",
+    "Strongly disagree",
+    "Don't know/Refused")), y = Proportion, fill = Response)) +
+     geom_col() +
+  # geom_text(aes(label = scales::percent(Proportion, accuracy = 1), group=Response),
+  #         hjust = -0.1,  
+  #         size = 4,      
+  #         color = "black",
+  #         fontface = "bold") +
+     scale_fill_brewer(palette = "Set3") +
+     labs(title = "Belief in the statement: \"Vaccines are effective.\"", subtitle = "Region: {closest_state}",
+       x = "", y = "") +
+     scale_y_continuous(labels = scales::percent_format()) +
+     coord_flip() +
+     theme_minimal() +
+     theme(legend.position = "none",
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        plot.title.position = "plot",
+        plot.title = element_text(size = 20, hjust = 0),
+        plot.subtitle = element_text(size = 15, hjust = 0, face="bold"),
+        axis.text.y = element_text(size = 9,, color = "black")) +
+     transition_states(Region, transition_length = 4, state_length = 2) +
+     ease_aes('cubic-in-out')
+
+animate(p, fps = 10, duration = 50)
+```
