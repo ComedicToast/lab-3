@@ -6,8 +6,11 @@ format:
     orientation: rows
     nav-buttons: [github]
     github: https://github.com/ComedicToast/olympicdash_copy
+    theme: minty
 embed-resources: true
 editor: source
+logo: Wellcome.png
+logo-alt: Wellcome logo
 execute: 
   echo: false
   warning: false
@@ -26,6 +29,7 @@ library(leaflet)
 library(geojsonio)
 library(sf)
 library(viridisLite)
+library(gt)
 ```
 
 ```{r}
@@ -38,11 +42,9 @@ dictionary <- read_excel(here("wgm2018.xlsx"), sheet=3)
 cleaned <- read.csv(here("wgm_cleaned.csv"))
 ```
 
+# Trust in scientists {.tabset}
 
-
-# Trust in scientists
-
-## Row - Leaflet Plot {height="60%}
+## Row - Leaflet Plot {height=60%}
 
 ```{r}
 #| label: clean crosstabs data
@@ -54,7 +56,6 @@ fill(Question, .direction="down") %>%
   select(1,4)
 ```
 
-
 ```{r}
 #| label: fix names
 q2data$Country[q2data$Country == "United States"] <- "United States of America"
@@ -62,14 +63,17 @@ q2data$Country[q2data$Country == "Congo, Rep."] <- "Republic of the Congo"
 q2data$Country[q2data$Country == "Tanzania"] <- "United Republic of Tanzania"
 ```
 
+```{r}
+#| label: load JSON
+#| include: false
+WorldCountry <- st_read(here("countries.geo.json"))
+```
 
 ```{r}
 #| label: second-improved-visualization
+#| title: Leaflet plot - Proportion of high trust in scientists
 #| message: false
 #| warning: false
-
-# Load GeoJSON
-WorldCountry <- st_read(here("countries.geo.json"))
 
 #join q2data and drop na's
 WorldCountry <-WorldCountry %>%
@@ -103,8 +107,75 @@ leaflet(WorldCountry) %>%
   )
 ```
 
+## Row - Info
 
-# Vaccines
+### Column - Table {width=40%}
+
+```{r}
+#| label: Table of proportions for  trust in scientists
+#| title: Proportion of trust in scientists by country
+
+trust_props <- crosstabs %>%
+fill(Question, .direction="down") %>%
+  filter(Question == "Wellcome Global Monitor Trust in Scientists Index (recoded into 3 categories)", Response %in% c("Low trust", "Medium trust", "High trust", "DK/Refused")) %>%
+  mutate(`Column N %...4` = round(`Column N %...4`,4)) %>%
+  rename(`Weighted_prop` = `Column N %...4`,
+         `Unweighted count` = `Unweighted Count...5`) %>%
+  select(1,3,4,5) 
+
+trust_props %>% gt()
+```
+
+### Column - Quick info 1 {.fill}
+
+```{r}
+Highest_trust <- trust_props %>%
+  filter(Response == "High trust") %>%
+  slice_max(Weighted_prop, n=1)
+
+Mediumest_trust <- trust_props %>%
+  filter(Response == "Medium trust") %>%
+  slice_max(Weighted_prop, n=1)
+
+Lowest_trust <- trust_props %>%
+  filter(Response == "Low trust") %>%
+  slice_max(Weighted_prop, n=1)
+```
+
+
+::: {.valuebox color="green" icon="person-check-fill" orientation="columns"}
+Highest "High Trust" proportion:
+
+<span style="font-size: 3em;">`{r}  Highest_trust$Country`
+
+<span style="font-size: 1.5em; font-weight: bold;">`{r}  Highest_trust$Weighted_prop`
+
+:::
+
+### Column - Quick info 23 {.fill}
+::: {.valuebox color="green" icon="person-dash-fill" orientation="columns"}
+Highest "Med. Trust" proportion:
+
+<span style="font-size: 3em;">`{r}  Mediumest_trust$Country`
+
+<span style="font-size: 1.5em; font-weight: bold;">`{r}  Mediumest_trust$Weighted_prop`
+
+:::
+### Column - Quick info 4321 {.fill}
+::: {.valuebox color="green" icon="person-fill-exclamation" orientation="columns"}
+Highest "Low Trust" proportion:
+
+<span style="font-size: 3em;">`{r}  Lowest_trust$Country`
+
+<span style="font-size: 1.5em; font-weight: bold;">`{r}  Lowest_trust$Weighted_prop`
+
+:::
+
+# Vaccines 
+
+
+## Row - Vaccine Graphics {.tabset}
+
 
 ```{r}
 # Remove the trailing comma
@@ -128,7 +199,6 @@ clean_regions <- left_join(cleaned_codes, countries_regions, by = "code") %>%
   distinct() 
 ```
 
-
 ```{r}
 grouped <- clean_regions %>%
   group_by(country) %>%
@@ -147,8 +217,6 @@ grouped <- clean_regions %>%
   filter(!is.na(Region))
 ```
 
-
-
 ```{r}
 #| label: top and bottom 5 from each region
 top5bot5 <- grouped %>% 
@@ -163,7 +231,6 @@ medians <- grouped %>%
         mutate(y = Inf, label = paste0(scales::percent(median_value, accuracy = 0.1)))
 ```
 
-
 ```{r}
 #| label: labels for each region
 label_data <- grouped %>%
@@ -172,9 +239,10 @@ label_data <- grouped %>%
   ungroup()
 ```
 
-
 ```{r}
 #| label: new-and-improved-visualization
+#| cache: true
+#| title: Vaccine Safety
 test <- grouped %>%
   ggplot(aes(x = pct_vaccines_safe, y=reorder(country, pct_vaccines_safe))) +
   geom_vline(
@@ -234,6 +302,7 @@ test <- grouped %>%
   scale_x_continuous(labels = percent_format(scale=100),
                      breaks = seq(0.4, 1, by = 0.2),
                      expand = expansion(mult = c(0.05, 0.15))) +
+  scale_color_brewer(palette = "Greens", direction = -1) +
                      coord_cartesian(clip = "off") +
                      transition_states(Region, transition_length = 0, state_length = 10)
 
@@ -241,9 +310,6 @@ animate(test, nframes = 60, duration = 30)
 ```
 
 
-
-
-## Row - Vaccine Graphics
 
 ```{r}
 #| label: clean/grab data for part 3
@@ -254,7 +320,6 @@ q3data <- crosstabs %>%
   rename(`Proportion` = `Column N %...4`) %>%
   select(1, 3:5)
 ```
-
 
 ```{r}
 # Remove the trailing comma
@@ -279,7 +344,6 @@ clean_regions <- left_join(cleaned_codes, countries_regions, by = "code") %>%
   distinct() 
 ```
 
-
 ```{r}
 # Remove the trailing comma
 text <- sub(",$", "", dictionary[57,3])
@@ -299,7 +363,6 @@ q3clean <- cleaned_codes %>%
   filter(Response != "Total") %>%
   rename(Counts = `Unweighted Count...5`)
 ```
-
 
 ```{r}
 region_response_props <- q3clean %>%
@@ -325,10 +388,10 @@ label_data <- region_response_props %>%
   ungroup()
 ```
 
-
 ```{r}
 #| label: third-improved-visualization
-
+#| cache: true
+#| title: Vaccine Efficiency
 p <- ggplot(region_response_props, aes(x = factor(Response, c(
     "Strongly agree",
     "Somewhat agree",
@@ -342,7 +405,7 @@ p <- ggplot(region_response_props, aes(x = factor(Response, c(
   #         size = 4,      
   #         color = "black",
   #         fontface = "bold") +
-     scale_fill_brewer(palette = "Set3") +
+     scale_fill_brewer(palette = "Greens", direction = -1) +
      labs(title = "Belief in the statement: \"Vaccines are effective.\"", subtitle = "Region: {closest_state}",
        x = "", y = "") +
      scale_y_continuous(labels = scales::percent_format()) +
@@ -360,3 +423,19 @@ p <- ggplot(region_response_props, aes(x = factor(Response, c(
 
 animate(p, fps = 10, duration = 50)
 ```
+
+## Row - Info
+
+### Column - Table2 {.tabset}
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+### Column - Quick infro 2
+
+test
