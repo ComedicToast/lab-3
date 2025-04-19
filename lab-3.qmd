@@ -44,7 +44,7 @@ cleaned <- read.csv(here("wgm_cleaned.csv"))
 
 # Trust in scientists {.tabset}
 
-## Row - Leaflet Plot {height=60%}
+## Row - Leaflet Plot {height="60%"}
 
 ```{r}
 #| label: clean crosstabs data
@@ -110,7 +110,7 @@ leaflet(WorldCountry) %>%
 
 ## Row - Info
 
-### Column - Table {width=40%}
+### Column - Table {width="40%"}
 
 ```{r}
 #| label: Table of proportions for  trust in scientists
@@ -144,38 +144,38 @@ Lowest_trust <- trust_props %>%
 ```
 
 
-::: {.valuebox color="green" icon="person-check-fill" orientation="columns"}
-Highest "High Trust" proportion:
+::: {.valuebox color="green" icon="person-check-fill"}
+Highest "High Trust" percent:
 
 <span style="font-size: 3em;">`{r}  Highest_trust$Country`
 
-<span style="font-size: 1.5em; font-weight: bold;">`{r}  Highest_trust$Weighted_prop`
+<span style="font-size: 1.5em; font-weight: bold;">`{r}  scales::percent(Highest_trust$Weighted_prop, accuracy=0.01)`
 
 :::
 
-### Column - Quick info 23 {.fill}
-::: {.valuebox color="green" icon="person-dash-fill" orientation="columns"}
-Highest "Med. Trust" proportion:
+### Column - Quick info 2{.fill}
+::: {.valuebox color="green" icon="person-dash-fill"}
+Highest "Med. Trust" percent:
 
 <span style="font-size: 3em;">`{r}  Mediumest_trust$Country`
 
-<span style="font-size: 1.5em; font-weight: bold;">`{r}  Mediumest_trust$Weighted_prop`
+<span style="font-size: 1.5em; font-weight: bold;">`{r}  scales::percent(Mediumest_trust$Weighted_prop, accuracy=0.01)`
 
 :::
-### Column - Quick info 4321 {.fill}
-::: {.valuebox color="green" icon="person-fill-exclamation" orientation="columns"}
-Highest "Low Trust" proportion:
+### Column - Quick info 3 {.fill}
+::: {.valuebox color="green" icon="person-fill-exclamation"}
+Highest "Low Trust" percent:
 
 <span style="font-size: 3em;">`{r}  Lowest_trust$Country`
 
-<span style="font-size: 1.5em; font-weight: bold;">`{r}  Lowest_trust$Weighted_prop`
+<span style="font-size: 1.5em; font-weight: bold;">`{r}  scales::percent(Lowest_trust$Weighted_prop, accuracy=0.01)`
 
 :::
 
 # Vaccines 
 
 
-## Row - Vaccine Graphics {.tabset}
+## Row - Vaccine Graphics {.tabset height="60%"}
 
 
 ```{r}
@@ -433,11 +433,12 @@ p <- ggplot(region_response_props, aes(x = factor(Response, c(
 animate(p, fps = 10, duration = 50)
 ```
 
-## Row - Info
+## Row - Info {height="40%"}
 
-### Column - Table2 {.tabset}
+### Column - Table2 {.tabset width="40%"}
 
 ```{r}
+#| label: Table of proportions for vaccine safety
 #| title: Are vaccines safe?
 safe_props <- crosstabs %>%
 fill(Question, .direction="down") %>%
@@ -455,6 +456,7 @@ safe_props %>% gt()
 
 ```{r}
 #| title: Are vaccines effective?
+#| label: Table of proportions for vaccine efficiency
 effective_props <- crosstabs %>%
 fill(Question, .direction="down") %>%
   filter(Question == "Q26 Do you strongly or somewhat agree, strongly or somewhat disagree or neither agree nor disagree with the following statement? Vaccines are effective.", Response %in% c("Strongly agree", "Somewhat agree", 
@@ -469,7 +471,63 @@ fill(Question, .direction="down") %>%
 effective_props %>% gt()
 ```
 
-### Column - Quick infro 2
+### Column - Quick info 2 {width="60%"}
 
+```{r}
+Highest_safe_agree <- safe_props %>%
+  filter(Response == "Strongly agree") %>%
+  slice_max(Weighted_prop, n=1)
 
-test
+Highest_effective_agree <- effective_props %>%
+  filter(Response == "Strongly agree") %>%
+  slice_max(Weighted_prop, n=1)
+
+Highest_safe_disagree <- safe_props %>%
+  filter(Response == "Strongly disagree") %>%
+  slice_max(Weighted_prop, n=1)
+
+Highest_effective_disagree <- effective_props %>%
+  filter(Response == "Strongly disagree") %>%
+  slice_max(Weighted_prop, n=1)
+```
+
+#### Row - Card Row 1
+
+##### Column - Card 1 {.fill}
+
+::: {.valuebox color="green" icon="cone-striped"}
+Highest percent who strongly agree vaccines are safe:
+
+<span style="font-size: 1.8em;">`{r} Highest_safe_agree$Country`
+`{r} scales::percent(Highest_safe_agree$Weighted_prop, accuracy = 0.01)`
+:::
+
+##### Column - Card 2 {.fill}
+
+::: {.valuebox color="green" icon="check-circle"}
+Highest percent who strongly agree vaccines are effective:
+
+<span style="font-size: 1.8em;">`{r} Highest_effective_agree$Country`
+`{r} scales::percent(Highest_effective_agree$Weighted_prop, accuracy = 0.01)`
+:::
+
+#### Row - Card Row 2
+
+##### Column - Card 3 {.fill}
+
+::: {.valuebox color="green" icon="exclamation-diamond-fill"}
+Highest percent who strongly disagree vaccines are safe:
+
+<span style="font-size: 1.8em;">`{r} Highest_safe_disagree$Country`
+`{r} scales::percent(Highest_safe_disagree$Weighted_prop, accuracy = 0.01)`
+:::
+
+##### Column - Card 4 {.fill}
+
+::: {.valuebox color="green" icon="x-circle"}
+
+Highest percent who strongly disagree vaccines are effective:
+
+<span style="font-size: 1.8em;">`{r} Highest_effective_disagree$Country`
+`{r} scales::percent(Highest_effective_disagree$Weighted_prop, accuracy = 0.01)`
+:::
