@@ -81,7 +81,8 @@ WorldCountry <-WorldCountry %>%
   drop_na()
 
 # Define color palette
-pal <- colorBin("Greens", domain = WorldCountry$`High trust in scientists %`, bins = 6, na.color = "lightgrey")
+pal <- colorBin("Greens", domain = WorldCountry$`High trust in scientists %`,
+                bins = 6, na.color = "lightgrey")
 
 # Create map
 leaflet(WorldCountry) %>%
@@ -186,7 +187,8 @@ parts <- strsplit(text, ",\\s*")[[1]]
 
 parts <- as_tibble(parts)
 
-country_codes <- separate_wider_delim(parts, value, delim = "=", names = c("code", "country"))
+country_codes <- separate_wider_delim(parts, value, delim = "=", 
+                                      names = c("code", "country"))
 
 cleaned_codes <- left_join(cleaned, country_codes, by = "country")
 
@@ -202,7 +204,8 @@ clean_regions <- left_join(cleaned_codes, countries_regions, by = "code") %>%
 ```{r}
 grouped <- clean_regions %>%
   group_by(country) %>%
-  mutate(pct_vaccines_safe = sum(National.results[answer %in% c("Strongly agree", "Somewhat agree")]) / 1) %>%
+  mutate(pct_vaccines_safe = sum(National.results[answer %in% 
+                                                    c("Strongly agree", "Somewhat agree")]) / 1) %>%
   select(country, pct_vaccines_safe, Regions_Report) %>%
   distinct() %>%
   mutate(Region = case_when(
@@ -228,7 +231,8 @@ top5bot5 <- grouped %>%
 medians <- grouped %>% 
         group_by(Region) %>% 
         summarize(median_value = median(pct_vaccines_safe)) %>%
-        mutate(y = Inf, label = paste0(scales::percent(median_value, accuracy = 0.1)))
+        mutate(y = Inf, label = paste0(scales::percent(median_value, 
+                                                       accuracy = 0.1)))
 ```
 
 ```{r}
@@ -294,7 +298,8 @@ test <- grouped %>%
     plot.margin = margin(15, 25, 15, 15)
   ) +
   labs(
-    title = "Percentage of people across countries who believes vaccines are safe",
+    title = "Percentage of people across countries who
+    believes vaccines are safe",
     subtitle = "Dashed line is the median for the region",
     x = "Percentage who believe vaccines are safe",
     y = ""
@@ -304,7 +309,8 @@ test <- grouped %>%
                      expand = expansion(mult = c(0.05, 0.15))) +
   scale_color_brewer(palette = "Greens", direction = -1) +
                      coord_cartesian(clip = "off") +
-                     transition_states(Region, transition_length = 0, state_length = 10)
+                     transition_states(Region, transition_length = 0,
+                                       state_length = 10)
 
 animate(test, nframes = 60, duration = 30)
 ```
@@ -330,7 +336,8 @@ parts <- strsplit(text, ",\\s*")[[1]]
 
 parts <- as_tibble(parts)
 
-country_codes <- separate_wider_delim(parts, value, delim = "=", names = c("code", "Country"))
+country_codes <- separate_wider_delim(parts, value, delim = "=",
+                                      names = c("code", "Country"))
 
 cleaned_codes <- left_join(q3data, country_codes, by = "Country")
 
@@ -353,7 +360,8 @@ parts <- strsplit(text, ",\\s*")[[1]]
 
 parts <- as_tibble(parts)
 
-region_codes <- separate_wider_delim(parts, value, delim = "=", names = c("Regions_Report", "Region"))
+region_codes <- separate_wider_delim(parts, value, delim = "=",
+                                     names = c("Regions_Report", "Region"))
 
 cleaned_codes <- left_join(clean_regions, region_codes, by = "Regions_Report")
 
@@ -406,7 +414,8 @@ p <- ggplot(region_response_props, aes(x = factor(Response, c(
   #         color = "black",
   #         fontface = "bold") +
      scale_fill_brewer(palette = "Greens", direction = -1) +
-     labs(title = "Belief in the statement: \"Vaccines are effective.\"", subtitle = "Region: {closest_state}",
+     labs(title = "Belief in the statement: \"Vaccines are effective.\"",
+          subtitle = "Region: {closest_state}",
        x = "", y = "") +
      scale_y_continuous(labels = scales::percent_format()) +
      coord_flip() +
@@ -429,13 +438,38 @@ animate(p, fps = 10, duration = 50)
 ### Column - Table2 {.tabset}
 
 ```{r}
+#| title: Are vaccines safe?
+safe_props <- crosstabs %>%
+fill(Question, .direction="down") %>%
+  filter(Question == "Q25 Do you strongly or somewhat agree, strongly or somewhat disagree or neither agree nor disagree with the following statement? Vaccines are safe.", Response %in% c("Strongly agree", "Somewhat agree", 
+                                       "Neither agree nor disagree", 
+                                       "Somewhat disagree", "Strongly disagree",
+                                       "Don't know/Refused")) %>%
+  mutate(`Column N %...4` = round(`Column N %...4`,4)) %>%
+  rename(`Weighted_prop` = `Column N %...4`,
+         `Unweighted count` = `Unweighted Count...5`) %>%
+  select(1,3,4,5) 
 
+safe_props %>% gt()
 ```
 
 ```{r}
+#| title: Are vaccines effective?
+effective_props <- crosstabs %>%
+fill(Question, .direction="down") %>%
+  filter(Question == "Q26 Do you strongly or somewhat agree, strongly or somewhat disagree or neither agree nor disagree with the following statement? Vaccines are effective.", Response %in% c("Strongly agree", "Somewhat agree", 
+                                       "Neither agree nor disagree", 
+                                       "Somewhat disagree", "Strongly disagree",
+                                       "Don't know/Refused")) %>%
+  mutate(`Column N %...4` = round(`Column N %...4`,4)) %>%
+  rename(`Weighted_prop` = `Column N %...4`,
+         `Unweighted count` = `Unweighted Count...5`) %>%
+  select(1,3,4,5) 
 
+effective_props %>% gt()
 ```
 
 ### Column - Quick infro 2
+
 
 test
