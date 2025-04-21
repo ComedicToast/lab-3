@@ -5,7 +5,7 @@ format:
   dashboard:
     orientation: rows
     nav-buttons: [github]
-    github: https://github.com/ComedicToast/olympicdash_copy
+    github: https://github.com/ComedicToast/lab-3
     theme: minty
 embed-resources: true
 editor: source
